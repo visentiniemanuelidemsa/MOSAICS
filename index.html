@@ -7,25 +7,34 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     body, html, #map { width: 100%; height: 100%; margin: 0; padding: 0; }
+    #loader {
+      position: absolute; top: 15px; right: 15px; z-index: 1000;
+      background: rgba(0, 0, 0, 0.75); color: #fff; padding: 10px 16px;
+      border-radius: 4px; font-family: sans-serif; font-size: 14px;
+    }
   </style>
 </head>
 <body>
+  <div id="loader">Cargando ortomosaico...</div>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/proj4"></script>
   <script src="https://unpkg.com/georaster"></script>
   <script src="https://unpkg.com/georaster-layer-for-leaflet"></script>
 
   <script>
-    const map = L.map('map').setView([0, 0], 2);
+    const map = L.map('map', { maxZoom: 23 }).setView([0, 0], 2);
 
-    // Mapa base Satelital sin requerimiento de API Key
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 21,
+      maxZoom: 23,
+      maxNativeZoom: 19,
       attribution: 'Tiles &copy; Esri'
     }).addTo(map);
 
-    const cogUrl = 'https://github.com/visentinemanuelidemsa/MOSAICS/releases/download/UAV/RGB-10cm-orthophoto_cog_jpeg.tif';
+    // URL a través de corsproxy para eludir la restricción de GitHub Releases
+    const rawCogUrl = 'https://github.com/visentinemanuelidemsa/MOSAICS/releases/download/UAV/RGB-10cm-orthophoto_cog_jpeg.tif';
+    const cogUrl = 'https://corsproxy.io/?' + encodeURIComponent(rawCogUrl);
 
     parseGeoraster(cogUrl).then(georaster => {
       const layer = new GeoRasterLayer({
@@ -33,9 +42,19 @@
         opacity: 1,
         resolution: 256
       });
+      
       layer.addTo(map);
-      map.fitBounds(layer.getBounds());
-    }).catch(err => console.error("Error al cargar el COG:", err));
+
+      // Centrado forzado y zoom directo sobre la extensión del ortomosaico
+      const bounds = layer.getBounds();
+      map.fitBounds(bounds, { maxZoom: 19, animate: false });
+
+      document.getElementById('loader').style.display = 'none';
+    }).catch(err => {
+      console.error("Error al cargar el COG:", err);
+      document.getElementById('loader').innerText = "Error al procesar el mosaico.";
+      document.getElementById('loader').style.backgroundColor = "rgba(180, 0, 0, 0.85)";
+    });
   </script>
 </body>
 </html>
